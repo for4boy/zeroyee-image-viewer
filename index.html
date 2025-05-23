@@ -1,115 +1,144 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZeroYee 圖片管理</title>
-  <style>
-    :root {
-      color-scheme: dark;
-    }
-    body {
-      font-family: sans-serif;
-      padding: 2rem;
-      background: #111;
-      color: #eee;
-    }
-    h1 {
-      margin-bottom: 1.5rem;
-    }
-    #gallery {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-    .card {
-      background: #222;
-      border: 1px solid #444;
-      padding: 1rem;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    }
-    .card img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin-bottom: 0.5rem;
-      border-radius: 4px;
-    }
-    .meta {
-      font-size: 0.8rem;
-      color: #aaa;
-      margin-bottom: 0.5rem;
-    }
-    button {
-      background: #e00;
-      color: white;
-      border: none;
-      padding: 0.3rem 0.6rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #c00;
-    }
-  </style>
+  <title>📁 ZeroYee 圖片管理介面</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h1>📁 ZeroYee 圖片管理介面</h1>
-  <div id="gallery">載入中...</div>
+<body class="bg-gray-900 text-white min-h-screen p-4">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-bold">📁 ZeroYee 圖片管理介面</h1>
+      <div>
+        <label class="cursor-pointer inline-flex items-center gap-2">
+          <input type="checkbox" id="theme-toggle" class="hidden" />
+          🌗 切換主題
+        </label>
+      </div>
+    </div>
+
+    <!-- 上傳 -->
+    <div class="mb-6">
+      <input type="file" id="upload" class="mb-2 text-black" />
+      <button id="uploadBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-1 rounded">
+        ⬆️ 上傳圖片
+      </button>
+    </div>
+
+    <!-- 圖片清單 -->
+    <div id="gallery" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <p id="status">📡 載入中...</p>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="fixed inset-0 hidden bg-black bg-opacity-80 items-center justify-center z-50">
+    <img id="modal-img" class="max-h-[90%] max-w-[90%]" />
+  </div>
 
   <script>
     const TOKEN = "Bd2047Mzk755@for4boy";
-    const API = `https://zeroyee.mydb.workers.dev/list?zeroyee_token=${encodeURIComponent(TOKEN)}`;
+    const API_URL = `https://zeroyee.mydb.workers.dev/list?zeroyee_token=${encodeURIComponent(TOKEN)}`;
+    const uploadBtn = document.getElementById("uploadBtn");
+    const gallery = document.getElementById("gallery");
+    const modal = document.getElementById("modal");
+    const modalImg = document.getElementById("modal-img");
 
+    // 主題切換
+    document.getElementById("theme-toggle").addEventListener("change", () => {
+      document.documentElement.classList.toggle("dark");
+    });
+
+    // Modal 關閉
+    modal.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+
+    // 載入圖片列表
     async function loadImages() {
       try {
-        const res = await fetch(API);
-        if (!res.ok) throw new Error("API 無回應");
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Unauthorized");
         const data = await res.json();
-
-        const gallery = document.getElementById("gallery");
         gallery.innerHTML = "";
 
         if (data.length === 0) {
-          gallery.innerHTML = "🚫 尚無圖片上傳";
+          gallery.innerHTML = "<p>📭 尚無圖片</p>";
           return;
         }
 
-        data.forEach(item => {
+        for (const item of data) {
           const card = document.createElement("div");
-          card.className = "card";
+          card.className = "relative group border border-gray-700 rounded p-2";
 
           const img = document.createElement("img");
           img.src = item.url;
           img.alt = item.key;
+          img.className = "w-full h-auto cursor-pointer rounded hover:opacity-90 transition";
 
-          const meta = document.createElement("div");
-          meta.className = "meta";
-          meta.innerHTML = `🗓️ ${new Date(item.uploaded).toLocaleString()}<br>📦 ${(item.size / 1024).toFixed(1)} KB`;
+          // 點圖開新視窗
+          img.addEventListener("click", () => {
+            modalImg.src = item.url;
+            modal.classList.remove("hidden");
+          });
 
-          const del = document.createElement("button");
-          del.innerText = "刪除圖片";
-          del.onclick = async () => {
-            if (!confirm(`確定要刪除 ${item.key} 嗎？`)) return;
-            const delURL = `${item.url}?zeroyee_token=${encodeURIComponent(TOKEN)}`;
-            const res = await fetch(delURL, { method: "DELETE" });
+          const info = document.createElement("div");
+          info.className = "text-sm text-gray-400 mt-1";
+          info.innerHTML = `
+            ${item.key}<br/>
+            🕒 ${new Date(item.uploaded).toLocaleString()}<br/>
+            📦 ${(item.size / 1024).toFixed(1)} KB
+          `;
+
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "🗑️";
+          delBtn.className = "absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-sm px-2 rounded hidden group-hover:block";
+          delBtn.addEventListener("click", async () => {
+            if (!confirm(`確定要刪除 "${item.key}" 嗎？`)) return;
+            const res = await fetch(`https://zeroyee.mydb.workers.dev/${item.key}?zeroyee_token=${encodeURIComponent(TOKEN)}`, {
+              method: "DELETE"
+            });
             if (res.ok) {
-              card.remove();
+              alert("✅ 已刪除");
+              loadImages();
             } else {
               alert("❌ 刪除失敗");
             }
-          };
+          });
 
           card.appendChild(img);
-          card.appendChild(meta);
-          card.appendChild(del);
+          card.appendChild(info);
+          card.appendChild(delBtn);
           gallery.appendChild(card);
-        });
+        }
       } catch (err) {
-        document.getElementById("gallery").innerHTML = `❌ 無法載入資料：${err.message}`;
+        gallery.innerHTML = `<p class="text-red-400">❌ 無法載入資料：${err.message}</p>`;
       }
     }
+
+    // 上傳功能
+    uploadBtn.addEventListener("click", async () => {
+      const fileInput = document.getElementById("upload");
+      const file = fileInput.files[0];
+      if (!file) return alert("請選擇檔案");
+
+      const res = await fetch(`https://zeroyee.mydb.workers.dev/${encodeURIComponent(file.name)}?zeroyee_token=${encodeURIComponent(TOKEN)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: await file.arrayBuffer()
+      });
+
+      if (res.ok) {
+        alert("✅ 上傳成功");
+        fileInput.value = "";
+        loadImages();
+      } else {
+        alert("❌ 上傳失敗");
+      }
+    });
 
     loadImages();
   </script>
