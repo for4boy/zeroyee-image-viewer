@@ -5,14 +5,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZeroYee 圖片管理</title>
   <style>
-    body { font-family: sans-serif; padding: 2rem; background: #f9f9f9; }
-    h1 { margin-bottom: 1.5rem; }
-    #gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
-    .card { background: white; border: 1px solid #ccc; padding: 1rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .card img { max-width: 100%; height: auto; display: block; margin-bottom: 0.5rem; }
-    .meta { font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; }
-    button { background: #e00; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #c00; }
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #111;
+      color: #eee;
+    }
+    h1 {
+      margin-bottom: 1.5rem;
+    }
+    #gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: #222;
+      border: 1px solid #444;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .card img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+    }
+    .meta {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-bottom: 0.5rem;
+    }
+    button {
+      background: #e00;
+      color: white;
+      border: none;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #c00;
+    }
   </style>
 </head>
 <body>
@@ -24,41 +63,52 @@
     const API = `https://zeroyee.mydb.workers.dev/list?zeroyee_token=${encodeURIComponent(TOKEN)}`;
 
     async function loadImages() {
-      const res = await fetch(API);
-      const data = await res.json();
-      const gallery = document.getElementById("gallery");
-      gallery.innerHTML = "";
+      try {
+        const res = await fetch(API);
+        if (!res.ok) throw new Error("API 無回應");
+        const data = await res.json();
 
-      data.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "card";
+        const gallery = document.getElementById("gallery");
+        gallery.innerHTML = "";
 
-        const img = document.createElement("img");
-        img.src = item.url;
-        img.alt = item.key;
+        if (data.length === 0) {
+          gallery.innerHTML = "🚫 尚無圖片上傳";
+          return;
+        }
 
-        const meta = document.createElement("div");
-        meta.className = "meta";
-        meta.innerHTML = `🗓️ ${new Date(item.uploaded).toLocaleString()}<br>📦 ${(item.size / 1024).toFixed(1)} KB`;
+        data.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "card";
 
-        const del = document.createElement("button");
-        del.innerText = "刪除圖片";
-        del.onclick = async () => {
-          if (!confirm(`確定要刪除 ${item.key} 嗎？`)) return;
-          const delURL = `${item.url}?zeroyee_token=${encodeURIComponent(TOKEN)}`;
-          const res = await fetch(delURL, { method: "DELETE" });
-          if (res.ok) {
-            card.remove();
-          } else {
-            alert("❌ 刪除失敗");
-          }
-        };
+          const img = document.createElement("img");
+          img.src = item.url;
+          img.alt = item.key;
 
-        card.appendChild(img);
-        card.appendChild(meta);
-        card.appendChild(del);
-        gallery.appendChild(card);
-      });
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.innerHTML = `🗓️ ${new Date(item.uploaded).toLocaleString()}<br>📦 ${(item.size / 1024).toFixed(1)} KB`;
+
+          const del = document.createElement("button");
+          del.innerText = "刪除圖片";
+          del.onclick = async () => {
+            if (!confirm(`確定要刪除 ${item.key} 嗎？`)) return;
+            const delURL = `${item.url}?zeroyee_token=${encodeURIComponent(TOKEN)}`;
+            const res = await fetch(delURL, { method: "DELETE" });
+            if (res.ok) {
+              card.remove();
+            } else {
+              alert("❌ 刪除失敗");
+            }
+          };
+
+          card.appendChild(img);
+          card.appendChild(meta);
+          card.appendChild(del);
+          gallery.appendChild(card);
+        });
+      } catch (err) {
+        document.getElementById("gallery").innerHTML = `❌ 無法載入資料：${err.message}`;
+      }
     }
 
     loadImages();
