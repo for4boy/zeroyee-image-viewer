@@ -1,146 +1,151 @@
 <!DOCTYPE html>
-<html lang="zh-Hant" class="dark">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📁 ZeroYee 圖片管理介面</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>ZeroYee 圖片管理介面</title>
+  <style>
+    body {
+      background-color: #111;
+      color: #f0f0f0;
+      font-family: sans-serif;
+      padding: 1em;
+    }
+    input[type="file"] {
+      margin-right: 0.5em;
+    }
+    button {
+      background-color: #333;
+      color: #f0f0f0;
+      border: 1px solid #666;
+      padding: 0.5em 1em;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #555;
+    }
+    #status {
+      margin-top: 1em;
+    }
+    .media-item {
+      display: inline-block;
+      margin: 1em;
+      vertical-align: top;
+    }
+    .media-item img, .media-item video {
+      border: 1px solid #666;
+      border-radius: 8px;
+      display: block;
+      margin-bottom: 0.5em;
+    }
+    .media-item div {
+      font-size: 0.9em;
+    }
+    .media-item button {
+      margin-top: 0.2em;
+      font-size: 0.9em;
+    }
+  </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-4">
-  <div class="max-w-4xl mx-auto">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">📁 ZeroYee 圖片管理介面</h1>
-      <div>
-        <label class="cursor-pointer inline-flex items-center gap-2">
-          <input type="checkbox" id="theme-toggle" class="hidden" />
-          🌗 切換主題
-        </label>
-      </div>
-    </div>
-
-    <!-- 上傳 -->
-    <div class="mb-6">
-      <input type="file" id="upload" class="mb-2 text-black" />
-      <button id="uploadBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-1 rounded">
-        ⬆️ 上傳圖片
-      </button>
-    </div>
-
-    <!-- 圖片清單 -->
-    <div id="gallery" class="grid grid-cols-2 md:grid-cols-3 gap-4">
-      <p id="status">📡 載入中...</p>
-    </div>
-  </div>
-
-  <!-- Modal -->
-  <div id="modal" class="fixed inset-0 hidden bg-black bg-opacity-80 items-center justify-center z-50">
-    <img id="modal-img" class="max-h-[90%] max-w-[90%]" />
-  </div>
+<body>
+  <h2>📁 ZeroYee 圖片管理介面</h2>
+  <input type="file" id="fileInput" />
+  <button id="uploadBtn">上傳</button>
+  <div id="status">載入中...</div>
+  <div id="imageList"></div>
 
   <script>
-    const TOKEN = "Bd2047Mzk755@for4boy";
-    const API_URL = `https://zeroyee.mydb.workers.dev/list?zeroyee_token=${encodeURIComponent(TOKEN)}`;
-    const uploadBtn = document.getElementById("uploadBtn");
-    const gallery = document.getElementById("gallery");
-    const modal = document.getElementById("modal");
-    const modalImg = document.getElementById("modal-img");
+    const apiUrl = "https://zeroyee.mydb.workers.dev"
+    const token = "Bd2047Mzk755@for4boy"
 
-    // 主題切換
-    document.getElementById("theme-toggle").addEventListener("change", () => {
-      document.documentElement.classList.toggle("dark");
-    });
+    const fileInput = document.getElementById("fileInput")
+    const uploadBtn = document.getElementById("uploadBtn")
+    const statusDiv = document.getElementById("status")
+    const imageList = document.getElementById("imageList")
 
-    // Modal 關閉
-    modal.addEventListener("click", () => {
-      modal.classList.add("hidden");
-    });
+    function formatSize(size) {
+      if (size < 1024) return `${size} B`
+      if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+      return `${(size / 1024 / 1024).toFixed(1)} MB`
+    }
 
-    // 載入圖片列表
+    function formatTime(timeStr) {
+      return new Date(timeStr).toLocaleString()
+    }
+
+    function createMediaElement(item) {
+      const ext = item.key.split(".").pop().toLowerCase()
+      const mediaContainer = document.createElement("div")
+      mediaContainer.className = "media-item"
+
+      let media
+      if (["mp4", "webm"].includes(ext)) {
+        media = document.createElement("video")
+        media.src = item.url
+        media.controls = true
+        media.style.maxWidth = "200px"
+      } else {
+        media = document.createElement("img")
+        media.src = item.url
+        media.alt = item.key
+        media.style.maxWidth = "200px"
+        media.style.cursor = "pointer"
+        media.onclick = () => window.open(item.url, "_blank")
+      }
+
+      const info = document.createElement("div")
+      info.textContent = `${item.key} (${formatSize(item.size)}) @ ${formatTime(item.uploaded)}`
+
+      const delBtn = document.createElement("button")
+      delBtn.textContent = "🗑️"
+      delBtn.onclick = async () => {
+        if (!confirm(`確定刪除 ${item.key}？`)) return
+        await fetch(`${apiUrl}/${item.key}?zeroyee_token=${encodeURIComponent(token)}`, { method: "DELETE" })
+        loadImages()
+      }
+
+      mediaContainer.append(media, info, delBtn)
+      return mediaContainer
+    }
+
     async function loadImages() {
+      statusDiv.textContent = "🔄 載入中..."
       try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error("Unauthorized");
-        const data = await res.json();
-        gallery.innerHTML = "";
-
-        if (data.length === 0) {
-          gallery.innerHTML = "<p>📭 尚無圖片</p>";
-          return;
-        }
-
-        for (const item of data) {
-          const card = document.createElement("div");
-          card.className = "relative group border border-gray-700 rounded p-2";
-
-          const img = document.createElement("img");
-          img.src = item.url;
-          img.alt = item.key;
-          img.className = "w-full h-auto cursor-pointer rounded hover:opacity-90 transition";
-
-          // 點圖開新視窗
-          img.addEventListener("click", () => {
-            modalImg.src = item.url;
-            modal.classList.remove("hidden");
-          });
-
-          const info = document.createElement("div");
-          info.className = "text-sm text-gray-400 mt-1";
-          info.innerHTML = `
-            ${item.key}<br/>
-            🕒 ${new Date(item.uploaded).toLocaleString()}<br/>
-            📦 ${(item.size / 1024).toFixed(1)} KB
-          `;
-
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "🗑️";
-          delBtn.className = "absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-sm px-2 rounded hidden group-hover:block";
-          delBtn.addEventListener("click", async () => {
-            if (!confirm(`確定要刪除 "${item.key}" 嗎？`)) return;
-            const res = await fetch(`https://zeroyee.mydb.workers.dev/${item.key}?zeroyee_token=${encodeURIComponent(TOKEN)}`, {
-              method: "DELETE"
-            });
-            if (res.ok) {
-              alert("✅ 已刪除");
-              loadImages();
-            } else {
-              alert("❌ 刪除失敗");
-            }
-          });
-
-          card.appendChild(img);
-          card.appendChild(info);
-          card.appendChild(delBtn);
-          gallery.appendChild(card);
-        }
-      } catch (err) {
-        gallery.innerHTML = `<p class="text-red-400">❌ 無法載入資料：${err.message}</p>`;
+        const res = await fetch(`${apiUrl}/list?zeroyee_token=${encodeURIComponent(token)}`)
+        const list = await res.json()
+        imageList.innerHTML = ""
+        list.forEach(item => {
+          const el = createMediaElement(item)
+          imageList.appendChild(el)
+        })
+        statusDiv.textContent = `✅ 共 ${list.length} 項`
+      } catch (e) {
+        statusDiv.textContent = "❌ 無法載入資料：Failed to fetch"
       }
     }
 
-    // 上傳功能
-    uploadBtn.addEventListener("click", async () => {
-      const fileInput = document.getElementById("upload");
-      const file = fileInput.files[0];
-      if (!file) return alert("請選擇檔案");
+    uploadBtn.onclick = async () => {
+      const file = fileInput.files[0]
+      if (!file) return alert("請選擇檔案")
 
-      const res = await fetch(`https://zeroyee.mydb.workers.dev/${encodeURIComponent(file.name)}?zeroyee_token=${encodeURIComponent(TOKEN)}`, {
+      statusDiv.textContent = "🚀 上傳中..."
+      const url = `${apiUrl}/${encodeURIComponent(file.name)}?zeroyee_token=${encodeURIComponent(token)}`
+      const res = await fetch(url, {
         method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-        },
-        body: await file.arrayBuffer()
-      });
+        headers: { "Content-Type": file.type },
+        body: file,
+      })
 
       if (res.ok) {
-        alert("✅ 上傳成功");
-        fileInput.value = "";
-        loadImages();
+        statusDiv.textContent = "✅ 上傳成功"
+        fileInput.value = ""
+        loadImages()
       } else {
-        alert("❌ 上傳失敗");
+        statusDiv.textContent = "❌ 上傳失敗"
       }
-    });
+    }
 
-    loadImages();
+    loadImages()
   </script>
 </body>
 </html>
