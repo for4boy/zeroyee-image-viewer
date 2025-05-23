@@ -3,149 +3,149 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZeroYee 圖片管理介面</title>
+  <title>📁 ZeroYee 圖片管理介面</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC&display=swap" rel="stylesheet">
   <style>
     body {
-      background-color: #111;
-      color: #f0f0f0;
-      font-family: sans-serif;
-      padding: 1em;
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #121212;
+      color: #eee;
+      margin: 0;
+      padding: 2rem;
     }
-    input[type="file"] {
-      margin-right: 0.5em;
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 1rem;
     }
-    button {
-      background-color: #333;
-      color: #f0f0f0;
-      border: 1px solid #666;
-      padding: 0.5em 1em;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #555;
+    #upload-form {
+      margin-bottom: 1.5rem;
     }
     #status {
-      margin-top: 1em;
+      margin: 1rem 0;
+      color: #4fc3f7;
     }
-    .media-item {
-      display: inline-block;
-      margin: 1em;
-      vertical-align: top;
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
     }
-    .media-item img, .media-item video {
-      border: 1px solid #666;
-      border-radius: 8px;
-      display: block;
-      margin-bottom: 0.5em;
+    .item {
+      background: #1e1e1e;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      text-align: center;
     }
-    .media-item div {
-      font-size: 0.9em;
+    .item img, .item video {
+      max-width: 100%;
+      max-height: 160px;
+      border-radius: 0.3rem;
+      cursor: pointer;
     }
-    .media-item button {
-      margin-top: 0.2em;
-      font-size: 0.9em;
+    .meta {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #aaa;
+    }
+    .btn {
+      margin-top: 0.5rem;
+      cursor: pointer;
+      color: #ff6e6e;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
     }
   </style>
 </head>
 <body>
-  <h2>📁 ZeroYee 圖片管理介面</h2>
-  <input type="file" id="fileInput" />
-  <button id="uploadBtn">上傳</button>
+  <h1>📁 ZeroYee 圖片管理介面</h1>
+  <form id="upload-form">
+    <input type="file" id="file" required />
+    <button type="submit">📤 上傳</button>
+  </form>
   <div id="status">載入中...</div>
-  <div id="imageList"></div>
+  <div id="grid" class="grid"></div>
 
   <script>
-    const apiUrl = "https://zeroyee.mydb.workers.dev"
-    const token = "Bd2047Mzk755@for4boy"
+    const TOKEN = "Bd2047Mzk755@for4boy";
+    const API = `https://zeroyee.mydb.workers.dev/list?zeroyee_token=${encodeURIComponent(TOKEN)}`;
 
-    const fileInput = document.getElementById("fileInput")
-    const uploadBtn = document.getElementById("uploadBtn")
-    const statusDiv = document.getElementById("status")
-    const imageList = document.getElementById("imageList")
-
-    function formatSize(size) {
-      if (size < 1024) return `${size} B`
-      if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-      return `${(size / 1024 / 1024).toFixed(1)} MB`
-    }
-
-    function formatTime(timeStr) {
-      return new Date(timeStr).toLocaleString()
-    }
-
-    function createMediaElement(item) {
-      const ext = item.key.split(".").pop().toLowerCase()
-      const mediaContainer = document.createElement("div")
-      mediaContainer.className = "media-item"
-
-      let media
-      if (["mp4", "webm"].includes(ext)) {
-        media = document.createElement("video")
-        media.src = item.url
-        media.controls = true
-        media.style.maxWidth = "200px"
-      } else {
-        media = document.createElement("img")
-        media.src = item.url
-        media.alt = item.key
-        media.style.maxWidth = "200px"
-        media.style.cursor = "pointer"
-        media.onclick = () => window.open(item.url, "_blank")
-      }
-
-      const info = document.createElement("div")
-      info.textContent = `${item.key} (${formatSize(item.size)}) @ ${formatTime(item.uploaded)}`
-
-      const delBtn = document.createElement("button")
-      delBtn.textContent = "🗑️"
-      delBtn.onclick = async () => {
-        if (!confirm(`確定刪除 ${item.key}？`)) return
-        await fetch(`${apiUrl}/${item.key}?zeroyee_token=${encodeURIComponent(token)}`, { method: "DELETE" })
-        loadImages()
-      }
-
-      mediaContainer.append(media, info, delBtn)
-      return mediaContainer
-    }
-
-    async function loadImages() {
-      statusDiv.textContent = "🔄 載入中..."
+    async function loadList() {
       try {
-        const res = await fetch(`${apiUrl}/list?zeroyee_token=${encodeURIComponent(token)}`)
-        const list = await res.json()
-        imageList.innerHTML = ""
-        list.forEach(item => {
-          const el = createMediaElement(item)
-          imageList.appendChild(el)
-        })
-        statusDiv.textContent = `✅ 共 ${list.length} 項`
-      } catch (e) {
-        statusDiv.textContent = "❌ 無法載入資料：Failed to fetch"
+        const res = await fetch(API);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        const grid = document.getElementById("grid");
+        grid.innerHTML = "";
+
+        if (data.length === 0) {
+          grid.innerHTML = "<p>目前沒有檔案</p>";
+        } else {
+          for (const item of data.reverse()) {
+            const div = document.createElement("div");
+            div.className = "item";
+
+            const ext = item.key.split(".").pop().toLowerCase();
+            let media;
+            if (["mp4", "webm", "ogg"].includes(ext)) {
+              media = document.createElement("video");
+              media.src = item.url;
+              media.controls = true;
+            } else {
+              media = document.createElement("img");
+              media.src = item.url;
+              media.alt = item.key;
+              media.onclick = () => window.open(item.url, "_blank");
+            }
+
+            const meta = document.createElement("div");
+            meta.className = "meta";
+            meta.innerText = `📄 ${item.key}\n📦 ${(item.size/1024).toFixed(1)} KB\n🕒 ${new Date(item.uploaded).toLocaleString()}`;
+
+            const del = document.createElement("button");
+            del.className = "btn";
+            del.innerText = "🗑️ 刪除";
+            del.onclick = async () => {
+              if (!confirm(`確定刪除 ${item.key} 嗎？`)) return;
+              const res = await fetch(`${item.url}?zeroyee_token=${encodeURIComponent(TOKEN)}`, {
+                method: "DELETE",
+              });
+              alert(await res.text());
+              loadList();
+            };
+
+            div.appendChild(media);
+            div.appendChild(meta);
+            div.appendChild(del);
+            grid.appendChild(div);
+          }
+        }
+        document.getElementById("status").innerText = `✅ 共 ${data.length} 項`;
+      } catch (err) {
+        document.getElementById("status").innerText = `❌ 無法載入資料：${err.message}`;
       }
     }
 
-    uploadBtn.onclick = async () => {
-      const file = fileInput.files[0]
-      if (!file) return alert("請選擇檔案")
+    document.getElementById("upload-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = document.getElementById("file").files[0];
+      if (!file) return;
+      const key = file.name;
+      const url = `https://zeroyee.mydb.workers.dev/${encodeURIComponent(key)}?zeroyee_token=${encodeURIComponent(TOKEN)}`;
 
-      statusDiv.textContent = "🚀 上傳中..."
-      const url = `${apiUrl}/${encodeURIComponent(file.name)}?zeroyee_token=${encodeURIComponent(token)}`
+      document.getElementById("status").innerText = "🚀 上傳中...";
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": file.type },
-        body: file,
-      })
+        body: await file.arrayBuffer(),
+      });
+      document.getElementById("status").innerText = await res.text();
+      loadList();
+    });
 
-      if (res.ok) {
-        statusDiv.textContent = "✅ 上傳成功"
-        fileInput.value = ""
-        loadImages()
-      } else {
-        statusDiv.textContent = "❌ 上傳失敗"
-      }
-    }
-
-    loadImages()
+    loadList();
   </script>
 </body>
 </html>
